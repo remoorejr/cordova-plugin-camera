@@ -473,7 +473,8 @@ static NSString* toBase64(NSData* data) {
         case DestinationTypeFileUri:
         {
             image = [self retrieveImage:info options:options];
-            NSData* data = [self processImage:image info:info options:options];
+            __block NSData* data = [self processImage:image info:info options:options];
+
             if (data) {
 
                 NSString* extension = options.encodingType == EncodingTypePNG? @"png" : @"jpg";
@@ -673,16 +674,22 @@ static NSString* toBase64(NSData* data) {
     CDVPluginResult* result = nil;
 
     if (self.metadata) {
+
+        // iOS 13 fix applied 9-23-2019, re; vlinde fork
+        // see: https://github.com/vlinde/cordova-plugin-camera-with-exif/blob/master/src/ios/CDVCamera.m
+        UIImage *image = [UIImage imageWithData:self.data];
+        CGImageRef imageRef = image.CGImage;
+
         CGImageSourceRef sourceImage = CGImageSourceCreateWithData((__bridge CFDataRef)self.data, NULL);
         CFStringRef sourceType = CGImageSourceGetType(sourceImage);
 
         CGImageDestinationRef destinationImage = CGImageDestinationCreateWithData((__bridge CFMutableDataRef)self.data, sourceType, 1, NULL);
-        CGImageDestinationAddImageFromSource(destinationImage, sourceImage, 0, (__bridge CFDictionaryRef)self.metadata);
+        CGImageDestinationAddImage(destinationImage, imageRef, (CFDictionaryRef)self.metadata);
         CGImageDestinationFinalize(destinationImage);
 
         CFRelease(sourceImage);
         CFRelease(destinationImage);
-    }
+    } 
 
     switch (options.destinationType) {
         case DestinationTypeFileUri:
@@ -752,6 +759,7 @@ static NSString* toBase64(NSData* data) {
 + (instancetype) createFromPictureOptions:(CDVPictureOptions*)pictureOptions;
 {
     CDVCameraPicker* cameraPicker = [[CDVCameraPicker alloc] init];
+    cameraPicker.modalPresentationStyle = UIModalPresentationFullScreen; 
     cameraPicker.pictureOptions = pictureOptions;
     cameraPicker.sourceType = pictureOptions.sourceType;
     cameraPicker.allowsEditing = pictureOptions.allowsEditing;
